@@ -2,88 +2,79 @@ package main
 
 import (
 	"demo"
+	"net/http"
 	"log"
 	"net"
+	"fmt"
 	)
+	
+var (
+	httpPort = ":3030"
+	iceAddress = "127.0.0.1"
+  icePort = 3737
+  icePassword = "password"
 
-var udpPort = 3737
+	// If any of these are set, an HTTP server will be run
+  iceAddressUrl =  "/ice-address"
+  icePortUrl = "/ice-port"
+  icePasswordUrl = "/ice-password"
+)
 
-// Do this if you need to provide the files to pass in the client's password to send back pings
-// func runHttpServer() {
-// 	http.HandleFunc("/ice", func(w http.ResponseWriter, r *http.Request) {
-// 		icePassword, err := ioutil.ReadAll(r.Body)
-// 		if err != nil {
-// 			log.Fatal("Connection to /ice blew up.")
-// 		}
-// 		go runIceQuicServer(icePassword)
-// 	})
-// 	http.Handle("/", http.FileServer(http.Dir(".")))
-
-// 	log.Fatal(http.ListenAndServe(":8080", nil))
-// }
-
-func runIceQuicServer(icePassword string) {
-	// TODO: Can we just do this? net.ListenUDP(???, &net.UDPAddr{})
-	udp, err := net.ListenUDP("udp", &net.UDPAddr{IP: nil, Port: udpPort})
+func runIceQuicServer() {
+	udp, err := net.ListenUDP("udp", &net.UDPAddr{IP: nil, Port: icePort})
 	if err != nil {
-		log.Fatalf("Failed to open UDP port %d: '%s'\n", udpPort, err)
+		log.Fatalf("Failed to open UDP port %d: '%s'\n", icePort, err)
 	}
 	log.Printf("Listening for ICE and QUIC on %s for password %s.\n", udp.LocalAddr(), icePassword)
 
 	buffer := make([]byte, 1500)
 	for {
 		size, addr, err := udp.ReadFromUDP(buffer[:])
+		log.Printf("Read packet of size %d from %s.\n", size, addr)
 		p := buffer[:size]
 		if err != nil {
 			log.Fatalf("Failed to read UDP packet: '%s'\n", err)
 		}
-		// log.Printf("Read packet of size %d from %s.\n", size, addr)
 		
 		stun := demo.VerifyStunPacket(p)
 		isIceCheck := (stun != nil && stun.Type() == demo.StunBindingRequest && stun.ValidateFingerprint())
-
-		if !isIceCheck {
-			log.Printf("It's an unknown packet.\n")
-			continue
+		if isIceCheck {
+			if !stun.ValidateMessageIntegrity([]byte(icePassword)) {
+				log.Printf("ICE check has bad message integrity.\n")
+				continue
+			}	
+			response := demo.NewStunPacket(demo.StunBindingResponse, stun.TransactionId()).AddMessageIntegrity([]byte(icePassword)).AddFingerprint()
+			_, err = udp.WriteTo(response, addr)
+			if err != nil {
+				log.Printf("Failed to write ICE check response.\n")
+			}
+		} else {
+			log.Printf("Read unknown packet of size %d from %s.\n", size, addr)
 		}
-		check := stun
-		// log.Printf("It's an ICE check.\n")
-
-		// Do this if you want
-		// if !check.ValidateMessageIntegrity(icePassword) {
-		//	log.Printf("ICE check has bad message integrity.\n")
-		//	continue
-		//}
-
-		// log.Printf("Received ICE packet with username %s from %v \n", username, addr)
-
-		response := demo.NewStunPacket(demo.StunBindingResponse, check.TransactionId()).AddMessageIntegrity([]byte(icePassword)).AddFingerprint()
-    
-		_, err = udp.WriteTo(response, addr)
-		if err != nil {
-			log.Printf("Failed to write ICE check response.\n")
-			continue
-		}
-		// log.Printf("Wrote ICE check response to %v.\n", addr)
-		
-		// Do this if you need to send checks back.  But it doesn't look like we need to.
-		// TODO: Don't assume local and remote ufrag and pwd are the same.
-		// username, found := check.FindUsername()
-		// if !found {
-		// 	log.Printf("ICE check has no username.\n")
-		// 	continue
-		// }
-	  // checkBack := demo.NewStunPacketWithRandomTid(demo.StunBindingRequest).AddUsername(username).AddMessageIntegrity(icePassword)
-    // 	_, err = udp.WriteTo(checkBack, addr)
-		// if err != nil {
-		// 	log.Printf("Failed to write ICE check back.\n")
-		// 	continue
-		// }
-		// log.Printf("Wrote ICE check back with username %s and password %s to %v.\n", username, icePassword, addr)
 	}
 }
 
+
+func runHttpServer() {
+	http.HandleFunc(iceAddressUrl, func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, iceAddress)
+	})
+	http.HandleFunc(icePortUrl, func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, icePort)
+	})
+	http.HandleFunc(icePasswordUrl, func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, icePassword)
+  })
+
+	http.Handle("/", http.FileServer(http.Dir(".")))
+	
+	log.Fatal(http.ListenAndServe(httpPort, nil))
+}
+	
+
 func main() {
-	// runHttpServer()
-	runIceQuicServer("password")
+	if (len(iceAddressUrl) > 0 || len(iceAddressUrl) > 0  || len(icePasswordUrl) > 0 ) {
+    go runHttpServer()
+	}
+	runIceQuicServer()
 }
