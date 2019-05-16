@@ -37,24 +37,24 @@ var rfc5769SampleRequest = []byte{
 var rfc5769SampleMsgPassword = []byte("VOkJxbRl1RmTxUk/WvJxBt")
 
 func TestSampleRequest(t *testing.T) {
-	p := verifyStunPacket(rfc5769SampleRequest)
-	if p.typ() != stunBindingRequest {
-		t.Errorf("p.typ() = %q, want %q", p.typ(), stunBindingRequest)
+	p := VerifyStunPacket(rfc5769SampleRequest)
+	if p.Type() != StunBindingRequest {
+		t.Errorf("p.typ() = %q, want %q", p.Type(), StunBindingRequest)
 	}
-	if !bytes.Equal(p.transactionId(), []byte{0xb7, 0xe7, 0xa7, 0x01, 0xbc, 0x34, 0xd6, 0x86, 0xfa, 0x87, 0xdf, 0xae}) {
+	if !bytes.Equal(p.TransactionId(), []byte{0xb7, 0xe7, 0xa7, 0x01, 0xbc, 0x34, 0xd6, 0x86, 0xfa, 0x87, 0xdf, 0xae}) {
 		t.Errorf("Bad transaction ID")
 	}
-	if !p.validateMessageIntegrity(rfc5769SampleMsgPassword) {
+	if !p.ValidateMessageIntegrity(rfc5769SampleMsgPassword) {
 		t.Errorf("Bad message integrity for sample")
 	}
-	if !p.validateFingerprint() {
+	if !p.ValidateFingerprint() {
 		t.Errorf("Bad fingerprint for sample")
 	}
-	p2 := newStunPacket(p.typ(), p.transactionId()).addMessageIntegrity(rfc5769SampleMsgPassword).addFingerprint()
-	if !p2.validateMessageIntegrity(rfc5769SampleMsgPassword) {
+	p2 := NewStunPacket(p.Type(), p.TransactionId()).AppendMessageIntegrity(rfc5769SampleMsgPassword).AppendFingerprint()
+	if !p2.ValidateMessageIntegrity(rfc5769SampleMsgPassword) {
 		t.Errorf("Bad message integrity for custom-built packet")
 	}
-	if !p2.validateFingerprint() {
+	if !p2.ValidateFingerprint() {
 		t.Errorf("Bad fingerprint for custom-built packet")
 	}
 }

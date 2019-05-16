@@ -43,7 +43,7 @@ func runIceQuicServer() {
 				log.Printf("ICE check has bad message integrity.\n")
 				continue
 			}	
-			response := demo.NewStunPacket(demo.StunBindingResponse, stun.TransactionId()).AddMessageIntegrity([]byte(icePassword)).AddFingerprint()
+			response := demo.NewStunPacket(demo.StunBindingResponse, stun.TransactionId()).AppendMessageIntegrity([]byte(icePassword)).AppendFingerprint()
 			_, err = udp.WriteTo(response, addr)
 			if err != nil {
 				log.Printf("Failed to write ICE check response.\n")

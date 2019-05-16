@@ -2,11 +2,9 @@ package demo
 
 import (
 	"crypto/hmac"
-	"crypto/rand"
 	"crypto/sha1"
 	"encoding/binary"
 	"hash/crc32"
-	"unicode/utf8"
 )
 
 const (
@@ -22,23 +20,65 @@ const (
 )
 
 type StunPacket []byte
-type StunAttr []byte
 
-func NewStunPacket(typ uint16, tid []byte) StunPacket {
-	p := StunPacket(make([]byte, stunHeaderSize, stunHeaderSize))
-	p.SetType(typ)
-	p.SetLength(0)
-	p.setCookie(stunMagicCookie)
-	p.SetTransactionId(tid)
-	return p
+func (p StunPacket) typeBytes() []byte {
+	return p[0:2]
+
+}
+func (p StunPacket) attrsLengthBytes() []byte {
+	return p[2:4]
 }
 
-func NewStunPacketWithRandomTid(typ uint16) StunPacket {
-	p := NewStunPacket(typ, nil)
-	// TODO: Seed rand.
-	rand.Reader.Read(p.TransactionId())
-	return p
+func (p StunPacket) cookieBytes() []byte {
+	return p[4:8]
 }
+
+func (p StunPacket) TransactionId() []byte {
+	return p[8:20]
+}
+
+func (p StunPacket) attrsBytes() []byte {
+	return p[20:]
+}
+
+
+func (p StunPacket) Type() uint16 {
+	return binary.BigEndian.Uint16(p.typeBytes())
+}
+
+func (p StunPacket) attrsLength() uint16 {
+	return binary.BigEndian.Uint16(p.attrsLengthBytes())
+}
+
+func (p StunPacket) cookie() uint32 {
+	return binary.BigEndian.Uint32(p.cookieBytes())
+}
+
+func (p StunPacket) totalClaimedLength() int {
+	return stunHeaderSize + int(p.attrsLength())
+}
+
+
+
+
+
+func (p StunPacket) setType(typ uint16) {
+	binary.BigEndian.PutUint16(p.typeBytes(), typ)
+}
+
+
+func (p StunPacket) setAttrsLength(length uint16) {
+	binary.BigEndian.PutUint16(p.attrsLengthBytes(), length)
+}
+
+func (p StunPacket) setCookie(cookie uint32) {
+	binary.BigEndian.PutUint32(p.cookieBytes(), cookie)
+}
+
+func (p StunPacket) setTransactionId(tid []byte) {
+	copy(p.TransactionId(), tid)
+}
+
 
 func VerifyStunPacket(b []byte) StunPacket {
 	if len(b) < stunHeaderSize {
@@ -48,58 +88,57 @@ func VerifyStunPacket(b []byte) StunPacket {
 	if p.cookie() != 0x2112A442 {
 		return nil
 	}
+	if len(b) < p.totalClaimedLength() {
+		return nil
+	}
+	// Chop off anything extra in the packet that's not needed.
+	return StunPacket(b[:p.totalClaimedLength()])
+}
+
+func NewStunPacket(typ uint16, tid []byte) StunPacket {
+	p := StunPacket(make([]byte, stunHeaderSize, stunHeaderSize))
+	p.setType(typ)
+	p.setAttrsLength(0)
+	p.setCookie(stunMagicCookie)
+	p.setTransactionId(tid)
 	return p
 }
 
-func (p StunPacket) typeBytes() []byte {
-	return p[0:2]
+
+type StunAttr []byte
+
+func (a StunAttr) typeBytes() []byte {
+	return a[0:2]
 }
 
-func (p StunPacket) Type() uint16 {
-	return binary.BigEndian.Uint16(p.typeBytes())
+func (a StunAttr) lengthBytes() []byte {
+	return a[2:4]
 }
 
-func (p StunPacket) SetType(typ uint16) {
-	binary.BigEndian.PutUint16(p.typeBytes(), typ)
+func (a StunAttr) bytes() []byte {
+	return a[4:]
 }
 
-func (p StunPacket) lengthBytes() []byte {
-	return p[2:4]
+
+func (a StunAttr) Type() uint16 {
+	return binary.BigEndian.Uint16(a.typeBytes())
 }
 
-func (p StunPacket) Length() uint16 {
-	return binary.BigEndian.Uint16(p.lengthBytes())
+func (a StunAttr) length() uint16 {
+	return binary.BigEndian.Uint16(a.lengthBytes())
 }
 
-func (p StunPacket) SetLength(length uint16) {
-	binary.BigEndian.PutUint16(p.lengthBytes(), length)
+func (a StunAttr) totalClaimedLength() int {
+	return stunAttrHeaderSize + int(a.length())
 }
 
-func (p StunPacket) cookieBytes() []byte {
-	return p[4:8]
+
+func (a StunAttr) setType(typ uint16) {
+	binary.BigEndian.PutUint16(a.typeBytes(), typ)
 }
 
-func (p StunPacket) cookie() uint32 {
-	return binary.BigEndian.Uint32(p.cookieBytes())
-}
-
-func (p StunPacket) setCookie(cookie uint32) {
-	binary.BigEndian.PutUint32(p.cookieBytes(), cookie)
-}
-
-func (p StunPacket) TransactionId() []byte {
-	return p[8:20]
-}
-
-func (p StunPacket) SetTransactionId(tid []byte) {
-	copy(p.TransactionId(), tid)
-}
-
-func (p StunPacket) attrsBytes() []byte {
-	if len(p) < int(stunHeaderSize+p.Length()) {
-		return nil
-	}
-	return p[stunHeaderSize:][:p.Length()]
+func (a StunAttr) setLength(length uint16) {
+	binary.BigEndian.PutUint16(a.lengthBytes(), length)
 }
 
 // Returns nil if it fails
@@ -108,102 +147,16 @@ func verifyStunAttr(b []byte) StunAttr {
 		return nil
 	}
 	a := StunAttr(b)
-	if len(b) < stunAttrHeaderSize+int(a.length()) {
+	if len(b) < a.totalClaimedLength() {
 		return nil
 	}
-	return a
+	// Chop off anything we extra on the end of the buffer
+	return StunAttr(b[:a.totalClaimedLength()])
 }
 
-func (a StunAttr) typeBytes() []byte {
-	return a[0:2]
-}
-
-func (a StunAttr) Type() uint16 {
-	return binary.BigEndian.Uint16(a.typeBytes())
-}
-
-func (a StunAttr) SetType(typ uint16) {
-	binary.BigEndian.PutUint16(a.typeBytes(), typ)
-}
-
-func (a StunAttr) lengthBytes() []byte {
-	return a[2:4]
-}
-
-func (a StunAttr) length() uint16 {
-	return binary.BigEndian.Uint16(a.lengthBytes())
-}
-
-func (a StunAttr) setLength(length uint16) {
-	binary.BigEndian.PutUint16(a.lengthBytes(), length)
-}
-
-func (a StunAttr) Bytes() []byte {
-	return a[stunAttrHeaderSize:][:a.length()]
-}
-
-func (p StunPacket) AddUsername(username string) StunPacket {
-	usernameB := []byte(username)
-	p, a := p.addAttr(stunAttrUsername, uint16(len(usernameB)))
-	copy(a.Bytes(), usernameB)
-	return p
-}
-
-func (p StunPacket) FindUsername() (string, bool) {
-	a, _ := p.findAttr(stunAttrUsername)
-	if a == nil || !utf8.Valid(a.Bytes()) {
-		return "", false
-	}
-	return string(a.Bytes()), true
-}
-
-func (p StunPacket) AddMessageIntegrity(key []byte) StunPacket {
-	truncatedLength := len(p)
-	p, a := p.addAttr(stunAttrMessageIntegrity, sha1.Size)
-	copy(a.Bytes(), p.computeMessageIntegrity(key, truncatedLength))
-	return p
-}
-
-func (p StunPacket) ValidateMessageIntegrity(key []byte) bool {
-	a, truncatedLength := p.findAttr(stunAttrMessageIntegrity)
-	if a == nil {
-		return false
-	}
-	return hmac.Equal(a.Bytes(), p.computeMessageIntegrity(key, truncatedLength))
-}
-
-func (p StunPacket) computeMessageIntegrity(key []byte, truncatedLength int) []byte {
-	// Tricky part: Include a funny length
-	oldLength := p.Length()
-	p.SetLength(uint16(truncatedLength + stunAttrHeaderSize))
-	defer p.SetLength(oldLength)
-
-	h := hmac.New(sha1.New, key)
-	h.Write(p[:truncatedLength])
-	return h.Sum(nil)
-}
-
-func (p StunPacket) AddFingerprint() StunPacket {
-	truncatedLength := len(p)
-	p, a := p.addAttr(stunAttrFingerprint, 4)
-	binary.BigEndian.PutUint32(a.Bytes(), p.computeFingerprint(truncatedLength))
-	return p
-}
-
-func (p StunPacket) ValidateFingerprint() bool {
-	a, truncatedLength := p.findAttr(stunAttrFingerprint)
-	if a == nil {
-		return false
-	}
-	return p.computeFingerprint(truncatedLength) == binary.BigEndian.Uint32(a.Bytes())
-}
-
-func (p StunPacket) computeFingerprint(truncatedLength int) uint32 {
-	return crc32.ChecksumIEEE(p[:truncatedLength]) ^ 0x5354554E
-}
 
 // Offset relative to the start of the packet
-func (p StunPacket) findAttr(typ uint16) (StunAttr, int) {
+func (p StunPacket) getAttr(typ uint16) (StunAttr, int) {
 	b := p.attrsBytes()
 
 	offset := 0
@@ -216,17 +169,14 @@ func (p StunPacket) findAttr(typ uint16) (StunAttr, int) {
 	}
 }
 
-func (p StunPacket) addAttr(typ uint16, length uint16) (StunPacket, StunAttr) {
-	p2len := p.Length() + stunAttrHeaderSize + roundUpTo4ByteBoundary(length)
-	p1size := stunHeaderSize + p.Length()
-	p2size := stunHeaderSize + p2len
-	p2 := StunPacket(make([]byte, p2size))
-	copy(p2, p[:p1size])
-	p2.SetLength(p2len)
-
-	a := StunAttr(p2[p1size:])
-	a.SetType(typ)
-	a.setLength(length)
+func (p1 StunPacket) appendAttr(attrType uint16, attrLength uint16) (StunPacket, StunAttr) {
+	extraLength := int(stunAttrHeaderSize + roundUpTo4ByteBoundary(attrLength))
+	p2 := StunPacket(make([]byte, len(p1) + extraLength))
+	copy(p2, p1)
+	p2.setAttrsLength(p1.attrsLength() + uint16(extraLength))
+	a := StunAttr(p2[len(p1):])
+	a.setType(attrType)
+	a.setLength(attrLength)
 	return p2, a
 }
 
@@ -237,3 +187,76 @@ func roundUpTo4ByteBoundary(val uint16) uint16 {
 	}
 	return val
 }
+
+
+func (p StunPacket) AppendMessageIntegrity(key []byte) StunPacket {
+	miOffset := p.totalClaimedLength()
+	p, a := p.appendAttr(stunAttrMessageIntegrity, sha1.Size)
+	copy(a.bytes(), p.computeMessageIntegrity(key, miOffset))
+	return p
+}
+
+func (p StunPacket) ValidateMessageIntegrity(key []byte) bool {
+	a, offset := p.getAttr(stunAttrMessageIntegrity)
+	if a == nil {
+		return false
+	}
+	return hmac.Equal(a.bytes(), p.computeMessageIntegrity(key, offset))
+}
+
+func (p StunPacket) computeMessageIntegrity(key []byte, miOffset int) []byte {
+	// Tricky part: Include a funny length here temporarily
+	oldAttrsLength := p.attrsLength()
+	p.setAttrsLength(uint16(miOffset + stunAttrHeaderSize))
+	defer p.setAttrsLength(oldAttrsLength)
+
+	h := hmac.New(sha1.New, key)
+	h.Write(p[:miOffset])
+	return h.Sum(nil)
+}
+
+
+func (p StunPacket) AppendFingerprint() StunPacket {
+	fpOffset := p.totalClaimedLength()
+	p, a := p.appendAttr(stunAttrFingerprint, 4)
+	binary.BigEndian.PutUint32(a.bytes(), p.computeFingerprint(fpOffset))
+	return p
+}
+
+func (p StunPacket) ValidateFingerprint() bool {
+	a, fpOffset := p.getAttr(stunAttrFingerprint)
+	if a == nil {
+		return false
+	}
+	return p.computeFingerprint(fpOffset) == binary.BigEndian.Uint32(a.bytes())
+}
+
+func (p StunPacket) computeFingerprint(fpOffset int) uint32 {
+	return crc32.ChecksumIEEE(p[:fpOffset]) ^ 0x5354554E
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
