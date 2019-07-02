@@ -41,7 +41,6 @@ func (p StunPacket) attrsBytes() []byte {
 	return p[20:]
 }
 
-
 func (p StunPacket) Type() uint16 {
 	return binary.BigEndian.Uint16(p.typeBytes())
 }
@@ -58,14 +57,9 @@ func (p StunPacket) totalClaimedLength() int {
 	return stunHeaderSize + int(p.attrsLength())
 }
 
-
-
-
-
 func (p StunPacket) setType(typ uint16) {
 	binary.BigEndian.PutUint16(p.typeBytes(), typ)
 }
-
 
 func (p StunPacket) setAttrsLength(length uint16) {
 	binary.BigEndian.PutUint16(p.attrsLengthBytes(), length)
@@ -78,7 +72,6 @@ func (p StunPacket) setCookie(cookie uint32) {
 func (p StunPacket) setTransactionId(tid []byte) {
 	copy(p.TransactionId(), tid)
 }
-
 
 func VerifyStunPacket(b []byte) StunPacket {
 	if len(b) < stunHeaderSize {
@@ -104,7 +97,6 @@ func NewStunPacket(typ uint16, tid []byte) StunPacket {
 	return p
 }
 
-
 type StunAttr []byte
 
 func (a StunAttr) typeBytes() []byte {
@@ -119,7 +111,6 @@ func (a StunAttr) bytes() []byte {
 	return a[4:]
 }
 
-
 func (a StunAttr) Type() uint16 {
 	return binary.BigEndian.Uint16(a.typeBytes())
 }
@@ -131,7 +122,6 @@ func (a StunAttr) length() uint16 {
 func (a StunAttr) totalClaimedLength() int {
 	return stunAttrHeaderSize + int(a.length())
 }
-
 
 func (a StunAttr) setType(typ uint16) {
 	binary.BigEndian.PutUint16(a.typeBytes(), typ)
@@ -154,7 +144,6 @@ func verifyStunAttr(b []byte) StunAttr {
 	return StunAttr(b[:a.totalClaimedLength()])
 }
 
-
 // Offset relative to the start of the packet
 func (p StunPacket) getAttr(typ uint16) (StunAttr, int) {
 	b := p.attrsBytes()
@@ -171,7 +160,7 @@ func (p StunPacket) getAttr(typ uint16) (StunAttr, int) {
 
 func (p1 StunPacket) appendAttr(attrType uint16, attrLength uint16) (StunPacket, StunAttr) {
 	extraLength := int(stunAttrHeaderSize + roundUpTo4ByteBoundary(attrLength))
-	p2 := StunPacket(make([]byte, len(p1) + extraLength))
+	p2 := StunPacket(make([]byte, len(p1)+extraLength))
 	copy(p2, p1)
 	p2.setAttrsLength(p1.attrsLength() + uint16(extraLength))
 	a := StunAttr(p2[len(p1):])
@@ -187,7 +176,6 @@ func roundUpTo4ByteBoundary(val uint16) uint16 {
 	}
 	return val
 }
-
 
 func (p StunPacket) AppendMessageIntegrity(key []byte) StunPacket {
 	miOffset := p.totalClaimedLength()
@@ -215,7 +203,6 @@ func (p StunPacket) computeMessageIntegrity(key []byte, miOffset int) []byte {
 	return h.Sum(nil)
 }
 
-
 func (p StunPacket) AppendFingerprint() StunPacket {
 	fpOffset := p.totalClaimedLength()
 	p, a := p.appendAttr(stunAttrFingerprint, 4)
@@ -234,29 +221,3 @@ func (p StunPacket) ValidateFingerprint() bool {
 func (p StunPacket) computeFingerprint(fpOffset int) uint32 {
 	return crc32.ChecksumIEEE(p[:fpOffset]) ^ 0x5354554E
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
