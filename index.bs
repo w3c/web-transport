@@ -1422,6 +1422,45 @@ in this specification, utilizing [[WEB-TRANSPORT-HTTP3]].
     </tbody>
   </table>
 
+# Error Handling
+
+Some operations throw or reject with {{WebTransportError}}. This is
+an extension of {{DOMException}} that carries additional information
+related WebTransport failure.</p>
+
+# Interface `WebTransportError` #  {#webtransport-error}
+
+<pre class="idl">
+[Exposed=(Window,Worker)]
+interface WebTransportError : DOMException {
+  constructor(octet appProtocolCode, optional DOMString message = "");
+  readonly attribute octet appProtocolCode;
+};
+</pre>
+
+## Constructor ##  {#webtransport-error-constructor}
+
+When the {{WebTransportError/constructor()}} constructor is invoked, the
+user agent MUST run the following steps:
+
+1. Let |appProtocolCode| be the constructor's first argument.
+1. Let |message| be the constructor's second argument.
+1. Let |e| be a new {{WebTransportError}} object.
+1. Invoke the {{DOMException}} constructor of |e| with
+   {{DOMException/message}} set to |message| and
+   {{DOMException/name}} argument set to `"WebTransportError"`.
+   <div class="note">
+     <p>This name does not have a mapping to a legacy code so
+      |e|'s {{DOMException/code}} attribute will return 0.
+1. Set |e|.`[[AppProtocolCode]]` to |appProtocolCode|.
+1. Return |e|.
+
+## Attributes ##  {#webtransport-error-attributes}
+
+: <dfn for="WebTransportError" attribute>appProtocolCode</dfn>
+:: The Application Protocol Error Code. The getter steps are:
+     1. Return [=this=].`[[AppProtocolCode]]`.
+
 # Privacy and Security Considerations #  {#privacy-security}
 
 This section is non-normative; it specifies no new behaviour, but instead
