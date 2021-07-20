@@ -190,6 +190,8 @@ There may be multiple [=WebTransport sessions=] on one [=connection=], when pool
 
 To <dfn for=session>establish</dfn> a [=WebTransport session=], follow [[!WEB-TRANSPORT-HTTP3]]
 [section 3.3](https://datatracker.ietf.org/doc/html/draft-ietf-webtrans-http3/#section-3.3).
+When establishing a session, the client MUST NOT provide any [=credentials=]
+via HTTP headers.
 
 To <dfn for=session>terminate</dfn> a [=WebTransport session=] |session| with an integer |code|,
 follow [[!WEB-TRANSPORT-HTTP3]]
