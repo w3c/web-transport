@@ -1435,11 +1435,11 @@ that can observe the network, so this has to be regarded as public information.
 All of the transport protocols described in this document use either TLS
 [[RFC8446]] or a semantically equivalent protocol, thus providing all of the
 security properties of TLS, including confidentiality and integrity of the
-traffic. Http3Transport uses the same certificate
-verification mechanism as outbound HTTP requests, thus relying on the same
-public key infrastructure for authentication of the remote server. In
-WebTransport, certificate verification errors are fatal; no interstitial
-allowing bypassing certificate validation is available.
+traffic. WebTransport over HTTP uses the same certificate verification
+mechanism as outbound HTTP requests, thus relying on the same public key
+infrastructure for authentication of the remote server. In WebTransport,
+certificate verification errors are fatal; no interstitial allowing bypassing
+certificate validation is available.
 
 ## State Persistence ##  {#state-persistence}
 
@@ -1461,8 +1461,9 @@ WebTransport imposes a set of requirements as described in
 
 1. Ensuring that the remote server is aware that the
    connection in question originates from a Web application; this is required
-   to prevent cross-protocol attacks. [[WEB-TRANSPORT-HTTP3]] uses ALPN
-   [[RFC7301]] for this purpose.
+   to prevent cross-protocol attacks. [[WEB-TRANSPORT-HTTP3]] uses a
+   combination of ALPN [[RFC7301]], an HTTP/3 setting and a `:protocol`
+   pseudo-header for this purpose.
 1. Allowing the server to filter connections based on the
    origin of the resource originating the transport session.
 
