@@ -1011,9 +1011,10 @@ To <dfn>verify a certificate fingerprint</dfn>, do the following:
 1. Let |referenceFingerprint| be the [=compute a certificate fingerprint|computed
    fingerprint=] of the input certificate.
 1. For every fingerprint |fingerprint| in |fingerprints|:
-   1. If {{RTCDtlsFingerprint/algorithm}} of |fingerprint| is equal to "sha-256",
-      and {{RTCDtlsFingerprint/value}} of |fingerprint| is equal to
-      |referenceFingerprint|, the certificate is valid.  Return true.
+   1. If {{RTCDtlsFingerprint/algorithm}} of |fingerprint| is equal to
+      "sha-256", and {{RTCDtlsFingerprint/value}} of |fingerprint| is
+      [=ASCII case-insensitive=] equal to |referenceFingerprint|, the
+      certificate is valid.  Return true.
 1. Return false.
 
 </div>
